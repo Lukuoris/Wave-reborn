@@ -38,9 +38,16 @@
 - **Settings Panel** - Configure everything through beautiful UI
 - **Qt5 Desktop App** - Alternative desktop interface available
 
+
+
 </td>
 </tr>
 </table>
+
+### Screenshots
+<img width="1723" height="951" alt="Panel" src="https://github.com/user-attachments/assets/a8d851a2-b4b9-4f97-977b-16f9b275155d" />
+<img width="1714" height="928" alt="setting" src="https://github.com/user-attachments/assets/52a1f511-aa81-4385-bfd0-bb4c51ca34e2" />
+
 
 ### 🔧 **Flexible & Configurable**
 - Customizable channel names and count
