@@ -2,7 +2,7 @@
 
 # 🌊 Wave Reborn
 
-### Professional Audio Mixer for Linux Streamers
+### Audio Mixer for Linux Streamers
 
 *Elgato Wave Link alternative built for Linux content creators*
 
@@ -225,70 +225,6 @@ ws.onmessage = (e) => {
 
 ---
 
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────┐
-│        Web UI / Qt5 Desktop App         │
-│    (Browser or Native Application)      │
-└──────────────────┬──────────────────────┘
-                   │ HTTP REST / WebSocket
-┌──────────────────▼──────────────────────┐
-│       FastAPI Backend (backend.py)      │
-│  - REST API endpoints                   │
-│  - WebSocket VU meters                  │
-│  - Static file serving                  │
-└──────────────────┬──────────────────────┘
-                   │ Python API
-┌──────────────────▼──────────────────────┐
-│        Audio Core (audio.py)            │
-│  - Channel management                   │
-│  - Application routing                  │
-│  - Volume/mute control                  │
-│  - VU meter calculations                │
-└──────────────────┬──────────────────────┘
-                   │ pactl subprocess calls
-┌──────────────────▼──────────────────────┐
-│           PulseAudio System             │
-│  - Null sinks (virtual channels)        │
-│  - Loopback modules (routing)           │
-│  - Sink inputs (applications)           │
-└─────────────────────────────────────────┘
-```
-
----
-
-## 🎯 How It Works
-
-### Audio Routing System
-
-Wave Reborn creates a sophisticated audio routing system using PulseAudio:
-
-#### 1. **Channel Creation**
-Each channel is a PulseAudio null-sink pair:
-- `Music_Apps` - Application routing sink (100% volume)
-- `Music_OBS` - Virtual sink for stream capture
-
-#### 2. **Dual Loopback Routing**
-For each channel, two loopback modules are created:
-- **Stream Path**: Channel → OBS Virtual Sink (controlled by Stream fader)
-- **Monitor Path**: Channel → Your Headphones (controlled by Monitor fader)
-
-#### 3. **Volume Control Philosophy**
-- **Stream Volume**: Controls what OBS/stream hears
-- **Monitor Volume**: Controls what you hear
-- **Application Volume**: Unaffected (apps control their own volume)
-- **Independent Control**: Stream and monitor are completely separate
-
-#### 4. **Application Routing**
-Applications are moved to channel sinks using `pactl move-sink-input`:
-```bash
-pactl move-sink-input 42 Music_Apps
-```
-The audio then flows through the loopback system with independent volume control.
-
----
-
 ## 🎮 Application Routing
 
 ### Via Web Interface
@@ -392,112 +328,6 @@ Higher latency = better stability, lower latency = less delay.
 
 ---
 
-## 📝 Project Structure
-
-```
-wave-reborn/
-├── backend.py              # FastAPI server (REST API + WebSocket + static files)
-├── audio.py                # PulseAudio control logic (core functionality)
-├── config.py               # Configuration management
-├── tray_app.py             # System tray application (PyQt5)
-├── wavepipe.py             # Desktop GUI application (Qt5)
-├── start.py                # Auto-setup launcher
-├── run_tray.sh             # Bash launcher for tray mode
-├── run_wavepipe.py         # Backend-only launcher
-├── configure.py            # Interactive configuration utility
-├── create_icon.py          # Icon generator utility
-├── requirements.txt        # Python dependencies
-├── wave_config.json        # User configuration (auto-generated)
-├── frontend/
-│   ├── index.html          # Main mixer interface
-│   └── settings.html       # Settings panel
-└── README.md               # This file
-```
-
----
-
-## 🔒 Security Considerations
-
-### Local-only by Default
-Wave Reborn binds to `127.0.0.1` by default, making it accessible only from your computer.
-
-### Network Access (Use with Caution)
-To expose the mixer to your local network:
-
-1. Edit `wave_config.json`:
-   ```json
-   {
-     "network": {
-       "backend_host": "0.0.0.0"
-     }
-   }
-   ```
-2. **Warning**: No authentication is implemented. Anyone on your network can control your audio.
-
-### Recommendations for Network Use
-- Use firewall rules to restrict access
-- Run behind a reverse proxy with authentication (nginx, Caddy)
-- Only use on trusted networks
-
----
-
-## 🛠️ Development
-
-### Running from Source
-
-```bash
-# Clone repository
-git clone https://github.com/Lukuoris/wave-reborn.git
-cd wave-reborn
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows (via WSL)
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run backend
-python backend.py
-# or with uvicorn directly
-uvicorn backend:app --host 127.0.0.1 --port 8000
-```
-
-### API Testing
-
-```bash
-# Get channels
-curl http://127.0.0.1:8000/channels
-
-# Set volume
-curl -X POST "http://127.0.0.1:8000/set_volume_stream?channel=Music&value=75"
-
-# Mute channel
-curl -X POST "http://127.0.0.1:8000/mute?channel=Game"
-
-# Get applications
-curl http://127.0.0.1:8000/applications
-
-# Route application
-curl -X POST "http://127.0.0.1:8000/route_application?app_index=42&channel=Music"
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! This project was created for the Linux streaming community.
-
-### Ways to Contribute
-- 🐛 Report bugs and issues
-- 💡 Suggest new features
-- 📝 Improve documentation
-- 🔧 Submit pull requests
-- ⭐ Star the project if you find it useful
-
----
 
 ## 📜 License
 
