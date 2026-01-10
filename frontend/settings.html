@@ -306,6 +306,63 @@
             color: #60a5fa;
             text-decoration: underline;
         }
+
+        /* Toggle Switch Styles */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 52px;
+            height: 28px;
+            cursor: pointer;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #27272a;
+            border: 1px solid #3f3f46;
+            border-radius: 28px;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #71717a;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            border-color: #3b82f6;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+            background-color: #fafafa;
+        }
+
+        .toggle-switch:hover .toggle-slider {
+            background-color: #3f3f46;
+        }
+
+        .toggle-switch input:checked:hover + .toggle-slider {
+            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%);
+        }
     </style>
 </head>
 <body>
@@ -381,6 +438,23 @@
                     <label for="frontend-port">Frontend Port</label>
                     <input type="number" id="frontend-port" min="1024" max="65535">
                     <div class="hint">Port for frontend server (default: 8080). Only used with start.py</div>
+                </div>
+            </div>
+
+            <!-- Application Settings -->
+            <div class="settings-section">
+                <h2>🚀 Application Settings</h2>
+
+                <div class="form-group">
+                    <label for="autostart-toggle">Autostart on Login</label>
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autostart-toggle" onchange="toggleAutostart(this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span id="autostart-status" style="color: #71717a; font-size: 14px;">Loading...</span>
+                    </div>
+                    <div class="hint">Automatically start Wave Reborn when you log in</div>
                 </div>
             </div>
 
@@ -569,9 +643,54 @@
             }, 5000);
         }
 
+        // Autostart functions
+        async function loadAutostartStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/autostart/status`);
+                const data = await res.json();
+                const toggle = document.getElementById('autostart-toggle');
+                const status = document.getElementById('autostart-status');
+
+                toggle.checked = data.enabled;
+                status.textContent = data.enabled ? 'Enabled' : 'Disabled';
+                status.style.color = data.enabled ? '#22c55e' : '#71717a';
+            } catch (error) {
+                console.error('Error loading autostart status:', error);
+                document.getElementById('autostart-status').textContent = 'Error';
+            }
+        }
+
+        async function toggleAutostart(enabled) {
+            try {
+                const endpoint = enabled ? 'enable' : 'disable';
+                const res = await fetch(`${API_BASE}/autostart/${endpoint}`, {
+                    method: 'POST'
+                });
+
+                const data = await res.json();
+                const status = document.getElementById('autostart-status');
+
+                if (data.status === 'ok') {
+                    status.textContent = enabled ? 'Enabled' : 'Disabled';
+                    status.style.color = enabled ? '#22c55e' : '#71717a';
+                    showStatus(`✅ Autostart ${enabled ? 'enabled' : 'disabled'} successfully!`, 'success');
+                } else {
+                    showStatus(`Error: ${data.message}`, 'error');
+                    // Revert toggle state
+                    document.getElementById('autostart-toggle').checked = !enabled;
+                }
+            } catch (error) {
+                console.error('Error toggling autostart:', error);
+                showStatus('Error toggling autostart: ' + error.message, 'error');
+                // Revert toggle state
+                document.getElementById('autostart-toggle').checked = !enabled;
+            }
+        }
+
         // Show device info when device changes
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
+            loadAutostartStatus();
 
             const deviceSelect = document.getElementById('output-device');
             deviceSelect.addEventListener('change', () => {

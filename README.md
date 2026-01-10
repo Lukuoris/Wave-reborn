@@ -67,20 +67,44 @@
 
 ### Installation
 
+#### Quick Start (Recommended)
+
 ```bash
 # Clone the repository
 git clone https://github.com/Lukuoris/wave-reborn.git
 cd wave-reborn
 
-# Run the launcher (auto-installs dependencies)
+# Run the launcher (auto-installs everything)
 python start.py
 ```
 
-That's it! The application will:
+That's it! On first run, the application will:
 1. Create a virtual environment
 2. Install all dependencies (FastAPI, Uvicorn, PyQt5)
-3. Start the backend server
-4. Open your browser to the mixer interface
+3. **Offer to install to your application menu** (recommended!)
+4. Start the backend server
+5. Open your browser to the mixer interface
+
+The installer will ask if you want to add Wave Reborn to your system menu - just press **Y** for convenient access from your application launcher!
+
+#### Manual System Integration
+
+If you skipped the installation during first run, you can install manually:
+
+```bash
+# Run the installation script
+./install.sh
+```
+
+This will:
+- Add Wave Reborn to your application launcher/menu
+- Install the application icon
+- Make it accessible from all desktop environments (GNOME, KDE, XFCE, etc.)
+
+**To uninstall:**
+```bash
+./uninstall.sh
+```
 
 ### Alternative: System Tray Mode (Recommended)
 
@@ -99,6 +123,20 @@ python tray_app.py
 - ⚙️ **Settings** - Configure audio and network
 - 🔄 **Restart Backend** - Apply changes
 - ❌ **Quit** - Clean shutdown
+
+### Autostart Configuration
+
+Enable Wave Reborn to start automatically on login:
+
+1. Open **⚙️ Settings** in the web interface
+2. Navigate to **🚀 Application Settings**
+3. Toggle **Autostart on Login**
+
+Or manually:
+```bash
+# The autostart file will be created at:
+# ~/.config/autostart/wave-reborn.desktop
+```
 
 ---
 
@@ -122,6 +160,7 @@ python tray_app.py
 - 🎧 **Audio Configuration** - Select output device, adjust latency
 - 📻 **Channel Management** - Add, remove, rename channels
 - 🌐 **Network Settings** - Configure ports and host binding
+- 🚀 **Application Settings** - Enable/disable autostart on login
 
 </div>
 
@@ -255,6 +294,25 @@ pactl move-sink-input 42 Music_Apps
 ---
 
 ## 🐛 Troubleshooting
+
+<details>
+<summary><b>Applications not routing to channels (stuck on EasyEffects)</b></summary>
+
+If you're using **EasyEffects** and applications won't stay on Wave Reborn channels after routing them:
+
+**Solution:**
+1. Open EasyEffects
+2. Go to the **"Applications"** tab (or "Inputs" section)
+3. Find your application in the list (game, browser, etc.)
+4. Click on the application
+5. Enable the **"Exclude"** or **"Bypass"** option for that application
+
+This tells EasyEffects to stop intercepting audio from that specific application, allowing Wave Reborn to control its routing instead.
+
+**Alternative:** If you don't need EasyEffects processing for certain apps, you can close EasyEffects before launching them, then route them to Wave Reborn channels.
+
+**Note:** This is a known limitation when using Wave Reborn alongside EasyEffects, as both tools compete for audio routing control.
+</details>
 
 <details>
 <summary><b>No audio devices found</b></summary>

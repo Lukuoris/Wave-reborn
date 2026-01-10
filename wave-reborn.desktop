@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Wave Reborn
+Comment=Professional Audio Mixer for Linux Streamers
+GenericName=Audio Mixer
+Exec=/mnt/data/project/wave reborn/run_tray.sh
+Icon=/mnt/data/project/wave reborn/wave_icon.png
+Terminal=false
+StartupNotify=false
+Categories=AudioVideo;Audio;Mixer;
+Keywords=audio;mixer;streaming;pulseaudio;

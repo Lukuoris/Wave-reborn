@@ -136,6 +136,71 @@ def get_audio_devices():
             content={"devices": [], "error": str(e)}
         )
 
+# Autostart endpoints
+@app.get("/autostart/status")
+def get_autostart_status():
+    """Check if autostart is enabled"""
+    autostart_dir = os.path.expanduser("~/.config/autostart")
+    autostart_file = os.path.join(autostart_dir, "wave-reborn.desktop")
+    return {"enabled": os.path.exists(autostart_file)}
+
+@app.post("/autostart/enable")
+def enable_autostart():
+    """Enable autostart"""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        autostart_dir = os.path.expanduser("~/.config/autostart")
+        os.makedirs(autostart_dir, exist_ok=True)
+
+        autostart_file = os.path.join(autostart_dir, "wave-reborn.desktop")
+        run_tray_script = os.path.join(script_dir, "run_tray.sh")
+        icon_path = os.path.join(script_dir, "wave_icon.png")
+
+        desktop_content = f"""[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Wave Reborn
+Comment=Professional Audio Mixer for Linux Streamers
+GenericName=Audio Mixer
+Exec={run_tray_script}
+Icon={icon_path}
+Terminal=false
+StartupNotify=false
+Categories=AudioVideo;Audio;Mixer;
+Keywords=audio;mixer;streaming;pulseaudio;
+X-GNOME-Autostart-enabled=true
+"""
+
+        with open(autostart_file, 'w') as f:
+            f.write(desktop_content)
+
+        os.chmod(autostart_file, 0o755)
+
+        return {"status": "ok", "message": "Autostart enabled successfully"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
+@app.post("/autostart/disable")
+def disable_autostart():
+    """Disable autostart"""
+    try:
+        autostart_dir = os.path.expanduser("~/.config/autostart")
+        autostart_file = os.path.join(autostart_dir, "wave-reborn.desktop")
+
+        if os.path.exists(autostart_file):
+            os.remove(autostart_file)
+            return {"status": "ok", "message": "Autostart disabled successfully"}
+        else:
+            return {"status": "ok", "message": "Autostart was not enabled"}
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "message": str(e)}
+        )
+
 # фронтенд
 frontend_dir = "frontend"
 if os.path.exists(frontend_dir):

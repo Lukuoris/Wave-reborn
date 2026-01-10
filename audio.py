@@ -272,6 +272,95 @@ def unmute_channel(channel):
 # -------------------
 # Application routing functions
 # -------------------
+def _get_smart_display_name(app_name, media_name, binary_name, process_id):
+    """
+    Smart logic to determine the best display name for an application
+
+    Priority:
+    1. Binary name (Discord, Steam, etc.) - most reliable
+    2. Application name if it's meaningful
+    3. Media name with truncation for long names
+    4. Fallback to app_name
+    """
+    # Skip generic/unhelpful names
+    unhelpful_names = [
+        'playStream',
+        'AudioStream',
+        'output',
+        'WEBRTC VoiceEngine',
+        'AudioCallbackDriver',
+        'libcanberra',
+        'System Sounds'
+    ]
+
+    # If we have a binary name, use it (most reliable)
+    if binary_name:
+        # Clean up binary name
+        clean_binary = binary_name
+
+        # Remove common suffixes
+        for suffix in ['-bin', '.bin', '.exe']:
+            if clean_binary.endswith(suffix):
+                clean_binary = clean_binary[:-len(suffix)]
+
+        # Capitalize first letter
+        clean_binary = clean_binary.capitalize()
+
+        # Special cases - map known binaries to friendly names
+        binary_mapping = {
+            'zen': 'Zen Browser',
+            'firefox': 'Firefox',
+            'chrome': 'Chrome',
+            'chromium': 'Chromium',
+            'discord': 'Discord',
+            'spotify': 'Spotify',
+            'steam': 'Steam',
+            'vlc': 'VLC Media Player',
+            'mpv': 'MPV',
+            'obs': 'OBS Studio',
+            'pavucontrol': 'PulseAudio Volume Control',
+            'telegram': 'Telegram',
+            'slack': 'Slack',
+            'teams': 'Microsoft Teams',
+            'zoom': 'Zoom',
+            'skype': 'Skype'
+        }
+
+        if clean_binary.lower() in binary_mapping:
+            display = binary_mapping[clean_binary.lower()]
+        else:
+            display = clean_binary
+
+        # For browsers, add media name (tab title) if available and meaningful
+        browser_binaries = ['zen', 'firefox', 'chrome', 'chromium', 'opera', 'brave', 'vivaldi', 'edge']
+        if clean_binary.lower() in browser_binaries and media_name and media_name not in unhelpful_names:
+            # Truncate long tab titles
+            max_tab_length = 50
+            tab_title = media_name
+            if len(tab_title) > max_tab_length:
+                tab_title = tab_title[:max_tab_length] + "..."
+            display = f"{display}: {tab_title}"
+        # For non-browsers, just add process ID
+        elif process_id:
+            display = f"{display} (PID: {process_id})"
+
+        return display
+
+    # If app_name is meaningful and not generic
+    if app_name and app_name not in unhelpful_names:
+        return app_name
+
+    # Use media_name but truncate if too long (like YouTube titles)
+    if media_name and media_name not in unhelpful_names:
+        # Truncate long media names (e.g., YouTube video titles)
+        max_length = 60
+        if len(media_name) > max_length:
+            return media_name[:max_length] + "..."
+        return media_name
+
+    # Final fallback
+    return app_name or "Unknown Application"
+
 def get_applications():
     """Get list of all applications (sink-inputs) with their info"""
     apps = []
@@ -298,13 +387,15 @@ def get_applications():
         idx = lines[0].strip().split()[0] if lines[0].strip() else None
         if not idx:
             continue
-        
+
         app_name = None
         media_name = None
+        binary_name = None
+        process_id = None
         sink_idx = None
         sink_name = None
         volume = 100
-        
+
         for line in section.split('\n'):
             if 'application.name = "' in line:
                 try:
@@ -314,6 +405,16 @@ def get_applications():
             elif 'media.name = "' in line:
                 try:
                     media_name = line.split('media.name = "')[1].split('"')[0]
+                except (IndexError, ValueError):
+                    pass
+            elif 'application.process.binary = "' in line:
+                try:
+                    binary_name = line.split('application.process.binary = "')[1].split('"')[0]
+                except (IndexError, ValueError):
+                    pass
+            elif 'application.process.id = "' in line:
+                try:
+                    process_id = line.split('application.process.id = "')[1].split('"')[0]
                 except (IndexError, ValueError):
                     pass
             elif line.strip().startswith('Sink:'):
@@ -329,7 +430,7 @@ def get_applications():
                     volume = int(float(vol_part))
                 except (IndexError, ValueError):
                     pass
-        
+
         if app_name:  # Only include applications with names (exclude loopbacks)
             # Determine which channel this is on
             channel = None
@@ -337,11 +438,15 @@ def get_applications():
                 if OBS_SINKS[ch] == sink_name:
                     channel = ch
                     break
-            
+
+            # Smart display name logic
+            display_name = _get_smart_display_name(app_name, media_name, binary_name, process_id)
+
             apps.append({
                 "index": idx,
-                "name": media_name or app_name,  # Используем media_name для отображения
+                "name": display_name,
                 "application": app_name,
+                "binary": binary_name,
                 "sink": sink_name,
                 "current_channel": channel,
                 "volume": volume
@@ -350,14 +455,78 @@ def get_applications():
     return apps
 
 def route_application_to_channel(app_index: str, channel: str):
-    """Route an application (sink-input) to a channel sink"""
+    """Route an application (sink-input) to a channel sink and persist the setting"""
     if channel not in CHANNELS:
         return False
-    
+
     sink_name = OBS_SINKS[channel]
-    result = subprocess.run(["pactl", "move-sink-input", app_index, sink_name], 
-                           capture_output=True, text=True)
-    return result.returncode == 0
+
+    # First, try to move using pactl
+    result = subprocess.run(
+        ["pactl", "move-sink-input", app_index, sink_name],
+        capture_output=True, text=True
+    )
+
+    # Check if move was successful
+    time.sleep(0.2)  # Small delay to let the system process the move
+
+    # Verify the move by checking current sink
+    check_res = subprocess.run(
+        ["pactl", "list", "sink-inputs"],
+        capture_output=True, text=True
+    )
+
+    moved_successfully = False
+    for section in check_res.stdout.split("Sink Input #"):
+        if section.startswith(app_index):
+            for line in section.split('\n'):
+                if line.strip().startswith('Sink:'):
+                    # Get current sink index
+                    try:
+                        current_sink_idx = line.split('Sink:')[1].strip().split()[0]
+                        # Get sink name for this index
+                        sink_res = subprocess.run(
+                            ["pactl", "list", "short", "sinks"],
+                            capture_output=True, text=True
+                        )
+                        for sink_line in sink_res.stdout.strip().split('\n'):
+                            parts = sink_line.split('\t')
+                            if len(parts) >= 2 and parts[0].strip() == current_sink_idx:
+                                if parts[1].strip() == sink_name:
+                                    moved_successfully = True
+                                break
+                    except (IndexError, ValueError):
+                        pass
+                    break
+            break
+
+    # If pactl move didn't work (likely due to EasyEffects), try alternative methods
+    if not moved_successfully:
+        # Try using pw-cli to move the stream
+        # First, find the PipeWire node ID for our target sink
+        wpctl_res = subprocess.run(
+            ["wpctl", "status"],
+            capture_output=True, text=True
+        )
+
+        target_node_id = None
+        for line in wpctl_res.stdout.split('\n'):
+            if sink_name in line:
+                try:
+                    target_node_id = line.strip().split('.')[0].strip()
+                except (IndexError, ValueError):
+                    pass
+                break
+
+        if target_node_id:
+            # Use pw-cli to link the stream to our target
+            subprocess.run(
+                ["pw-cli", "set-param", app_index, "Props", f"{{ target.object = {target_node_id} }}"],
+                check=False, capture_output=True
+            )
+            time.sleep(0.1)
+
+    return moved_successfully or result.returncode == 0
 
 # -------------------
 # VU meter functions
